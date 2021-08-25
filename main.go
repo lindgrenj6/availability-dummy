@@ -15,9 +15,11 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-var ctx = context.Background()
-var cfg = clowder.LoadedConfig
-var k = &kafka.Writer{}
+var (
+	ctx = context.Background()
+	cfg = clowder.LoadedConfig
+	k   = &kafka.Writer{}
+)
 
 func main() {
 	if !clowder.IsClowderEnabled() {
