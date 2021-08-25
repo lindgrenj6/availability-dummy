@@ -107,7 +107,10 @@ func setupKafka() {
 
 func send(msg, xrhid []byte) {
 	k.WriteMessages(ctx, kafka.Message{
-		Headers: []kafka.Header{{Key: "x-rh-identity", Value: xrhid}},
-		Value:   msg,
+		Headers: []kafka.Header{
+			{Key: "x-rh-identity", Value: xrhid},
+			{Key: "event_type", Value: []byte("availability_status")},
+		},
+		Value: msg,
 	})
 }
