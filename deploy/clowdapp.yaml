@@ -17,6 +17,13 @@ objects:
           enabled: true # port 8000 is default in ClowdEnvironment
       podSpec:
         image: ${IMAGE}:${IMAGE_TAG}
+        env:
+        - name: SOURCES_SCHEME
+          value: ${SOURCES_SCHEME}
+        - name: SOURCES_HOST
+          value: ${SOURCES_HOST}
+        - name: SOURCES_PORT
+          value: ${SOURCES_PORT}
         resources:
           limits:
             cpu: ${CPU_LIMIT}
@@ -55,3 +62,15 @@ parameters:
 - description: Clowder ENV
   name: ENV_NAME
   required: true
+- name: SOURCES_SCHEME
+  displayName: Sources Service Scheme
+  description: Scheme to use for the Sources service URL.
+  value: http
+- name: SOURCES_HOST
+  displayName: Sources Service Host
+  description: Host to use for the Sources service URL.
+  value: sources-api-svc
+- name: SOURCES_PORT
+  displayName: Sources Service Port
+  description: Port to use for the Sources service URL.
+  value: "8000"
