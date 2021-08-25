@@ -31,32 +31,24 @@ func main() {
 	e.Use(middleware.Logger())
 
 	// Cost
-	e.POST("/api/cost-management/v1/source-status/", func(c echo.Context) error {
-		body := make(map[string]interface{})
-		err := c.Bind(&body)
-		if err != nil {
-			return c.String(http.StatusBadRequest, err.Error())
-		}
-
-		e.Logger.Infof("%+v", body)
-		go send(randomStatusMessage("source", body["source_id"].(string)))
-		return c.String(http.StatusOK, "OK")
-	})
-
+	e.POST("/api/cost-management/v1/source-status/", reqHandler)
 	// Swatch
-	e.POST("/internal/api/cloudigrade/v1/availability_status", func(c echo.Context) error {
-		body := make(map[string]interface{})
-		err := c.Bind(&body)
-		if err != nil {
-			return c.String(http.StatusBadRequest, err.Error())
-		}
-
-		e.Logger.Infof("%+v", body)
-		go send(randomStatusMessage("source", body["source_id"].(string)))
-		return c.String(http.StatusOK, "OK")
-	})
+	e.POST("/internal/api/cloudigrade/v1/availability_status", reqHandler)
 
 	e.Logger.Fatal(e.Start(":8000"))
+}
+
+func reqHandler(c echo.Context) error {
+	body := make(map[string]interface{})
+	err := c.Bind(&body)
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+	xrhid := c.Request().Header.Get("x-rh-identity")
+
+	c.Logger().Debugf("%+v", body)
+	go send(randomStatusMessage("source", body["source_id"].(string)), []byte(xrhid))
+	return c.String(http.StatusOK, "OK")
 }
 
 type StatusMessage struct {
@@ -110,11 +102,9 @@ func setupKafka() {
 	})
 }
 
-func send(msg []byte) {
+func send(msg, xrhid []byte) {
 	k.WriteMessages(ctx, kafka.Message{
-		Headers: []kafka.Header{
-			{Key: "x-rh-sources-account-number", Value: []byte("1460290")},
-		},
-		Value: msg,
+		Headers: []kafka.Header{{Key: "x-rh-identity", Value: xrhid}},
+		Value:   msg,
 	})
 }
