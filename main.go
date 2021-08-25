@@ -31,6 +31,7 @@ func main() {
 	e := echo.New()
 	e.Logger.SetLevel(log.DEBUG)
 	e.Use(middleware.Logger())
+	e.GET("/healthz", func(c echo.Context) error { return c.String(http.StatusOK, "OK") })
 
 	// Cost
 	e.POST("/api/cost-management/v1/source-status/", reqHandler)
