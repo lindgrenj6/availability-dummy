@@ -27,3 +27,12 @@ bonfire process sources \
 
 ```
 After this sources-api should be configured to hit the dummy endpoint. And you are free to create sources and have them randomly marked available/unavailable when the checkers run!
+
+### Random vs always available/unavailable
+By default true randomness will be used to set availability status - `rand.Int() % 2 == 0` _should_ result in 50/50 split of available/unavailable.
+
+If you did want the app to always set the status to available or unavailable it is supported via a parameter in the template: `STATUS`.
+
+Just add this to your pipeline for bonfire:
+1. `-p sources-availability/STATUS=available` (or unavailable)
+2. Apply the template, wait for it to come up, then it will no longer be random.

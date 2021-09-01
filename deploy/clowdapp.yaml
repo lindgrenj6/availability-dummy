@@ -24,6 +24,8 @@ objects:
           value: ${SOURCES_HOST}
         - name: SOURCES_PORT
           value: ${SOURCES_PORT}
+        - name: STATUS
+          value: ${STATUS}
         resources:
           limits:
             cpu: ${CPU_LIMIT}
@@ -74,3 +76,5 @@ parameters:
   displayName: Sources Service Port
   description: Port to use for the Sources service URL.
   value: "8000"
+- name: STATUS
+  value: "RANDOM"

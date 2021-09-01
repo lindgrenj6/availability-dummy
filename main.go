@@ -85,7 +85,8 @@ func sendBackRandomResponse(c echo.Context, appTypeId string) {
 		// 3. Look up Application associated with the Source
 		appID := getApplicationID(xrhid, body["source_id"].(string), appTypeId)
 		// 4. Send an availability_status message back to sources, using same x-rh-id
-		sendMessageToSources(randomStatusMessage(appID), []byte(xrhid))
+		msg := generateStatusMessage(&StatusMessage{ResourceID: appID, ResourceType: "application"})
+		sendMessageToSources(msg, []byte(xrhid))
 	}(c, body, appTypeId)
 }
 
@@ -99,18 +100,24 @@ type StatusMessage struct {
 }
 
 // Generates a random status message for an application id
-func randomStatusMessage(id string) []byte {
-	msg := &StatusMessage{ResourceType: "application", ResourceID: id}
-
-	// Flip a coin.
-	// 	if heads: its available
-	//  otherwise: unavailable, because "I have spoken."
-	// TODO: hook into `fortune` on linux to spit out random reasons why
-	if rand.Int()%2 == 0 {
+func generateStatusMessage(msg *StatusMessage) []byte {
+	switch strings.ToLower(os.Getenv("STATUS")) {
+	case "available":
 		msg.Status = "available"
-	} else {
+	case "unavailable":
 		msg.Status = "unavailable"
 		msg.Error = "I have spoken."
+	default:
+		// Flip a coin.
+		// 	if heads: its available
+		//  otherwise: unavailable, because "I have spoken."
+		// TODO: hook into `fortune` on linux to spit out random reasons why
+		if rand.Int()%2 == 0 {
+			msg.Status = "available"
+		} else {
+			msg.Status = "unavailable"
+			msg.Error = "I have spoken."
+		}
 	}
 
 	// unmarshal the message, panicing if it fails because it really shouldn't.
