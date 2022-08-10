@@ -1,31 +1,34 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"os"
 	"strings"
 
+	skafka "github.com/RedHatInsights/sources-api-go/kafka"
+	sutil "github.com/RedHatInsights/sources-api-go/util"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	"github.com/labstack/gommon/log"
 	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
-	sources "github.com/redhatinsights/sources-superkey-worker/sources"
 	"github.com/segmentio/kafka-go"
+	"github.com/segmentio/kafka-go/protocol"
 )
 
 var (
-	ctx = context.Background()
 	// clowder config
 	cfg = clowder.LoadedConfig
 	// kafka writer
-	k = &kafka.Writer{}
+	k *kafka.Writer
 	// cost/subswatch IDs for foreign key lookups.
 	costID   string
 	swatchID string
+
+	sourcesURL = fmt.Sprintf("%s://%s:%s/api/sources/v3.1", "http", os.Getenv("SOURCES_HOST"), os.Getenv("SOURCES_PORT"))
 )
 
 func main() {
@@ -85,7 +88,7 @@ func sendBackRandomResponse(c echo.Context, appTypeId string) {
 		// 3. Look up Application associated with the Source
 		appID := getApplicationID(xrhid, body["source_id"].(string), appTypeId)
 		// 4. Send an availability_status message back to sources, using same x-rh-id
-		msg := generateStatusMessage(&StatusMessage{ResourceID: appID, ResourceType: "application"})
+		msg := generateStatusMessage(&StatusMessage{ResourceID: appID, ResourceType: "Application"})
 		sendMessageToSources(msg, []byte(xrhid))
 	}(c, body, appTypeId)
 }
@@ -121,12 +124,7 @@ func generateStatusMessage(msg *StatusMessage) []byte {
 	}
 
 	// unmarshal the message, panicing if it fails because it really shouldn't.
-	out, err := json.Marshal(msg)
-	if err != nil {
-		panic(err)
-	}
-
-	return out
+	return must(json.Marshal(msg))
 }
 
 // Sends a message to sources with:
@@ -136,31 +134,30 @@ func generateStatusMessage(msg *StatusMessage) []byte {
 // body:
 //   marshaled json `StatusMessage` struct
 func sendMessageToSources(msg, xrhid []byte) {
-	k.WriteMessages(ctx, kafka.Message{
-		Headers: []kafka.Header{
+	err := skafka.Produce(k, &skafka.Message{
+		Headers: []protocol.Header{
 			{Key: "x-rh-identity", Value: xrhid},
 			{Key: "event_type", Value: []byte("availability_status")},
 		},
 		Value: msg,
 	})
+	if err != nil {
+		fmt.Printf(`{"error": %v}\n`, err)
+	}
 }
 
 // Fetches an applicationID from a specific source.
 func getApplicationID(xrhid, sourceID, appTypeID string) string {
-	// construct a new client - with the default header being the x-rh-identity
-	client, err := sources.NewAPIClient(xrhid)
-	if err != nil {
-		panic(err)
-	}
+	// // GET /sources/:id/applications
+	// // TODO: handle errors. though it should "just work"
+	coll := getCollection("/sources/"+sourceID+"/applications", xrhid)
 
-	// GET /sources/:id/applications
-	// TODO: handle errors. though it should "just work"
-	applications, _, _ := client.DefaultApi.ListSourceApplications(ctx, sourceID).Execute()
 	// iterate over the applications, returning the one that matches the application type
 	// we passed in.
-	for _, s := range *applications.Data {
-		if *s.SourceId == sourceID && *s.ApplicationTypeId == appTypeID {
-			return *s.Id
+	for _, s := range coll.Data {
+		app := s.(map[string]any)
+		if app["source_id"] == sourceID && app["application_type_id"] == appTypeID {
+			return app["id"].(string)
 		}
 	}
 
@@ -170,27 +167,21 @@ func getApplicationID(xrhid, sourceID, appTypeID string) string {
 
 // Lists all application types and sets the keys for us to compare against.
 func getApplicationTypes() {
-	// canned x-rh-id, looks like this: {"identity": {"account_number": "nil", "user": {"is_org_admin": true}}}
-	client, err := sources.NewAPIClient("eyJpZGVudGl0eSI6IHsiYWNjb3VudF9udW1iZXIiOiAibmlsIiwgInVzZXIiOiB7ImlzX29yZ19hZG1pbiI6IHRydWV9fX0=")
-	if err != nil {
-		panic(err)
-	}
-	data, resp, _ := client.DefaultApi.ListApplicationTypes(ctx).Execute()
 	// This is a failure that can't be tolerated - if we cannot hit sources to get
 	// the application types we aren't going to have a good time when trying to look up
 	// other things from sources-api.
-	if resp.StatusCode != 200 {
-		panic("Failed to fetch ApplicationTypes")
-	}
+	coll := getCollection("/application_types", "")
 
 	// iterate over the application types - extracting the 2 IDs that we care about
 	// and store them in the global var list.
-	for _, v := range *data.Data {
-		if strings.HasSuffix(*v.Name, "cost-management") {
-			costID = *v.Id
+	for _, v := range coll.Data {
+		at := v.(map[string]any)
+
+		if strings.HasSuffix(at["name"].(string), "cost-management") {
+			costID = at["id"].(string)
 		}
-		if strings.HasSuffix(*v.Name, "cloud-meter") {
-			swatchID = *v.Id
+		if strings.HasSuffix(at["name"].(string), "cloud-meter") {
+			swatchID = at["id"].(string)
 		}
 	}
 }
@@ -198,11 +189,6 @@ func getApplicationTypes() {
 // connect to kafka based on clowder config. A bit verbose, but its because
 // clowder is more of a "request" model rather than "declare"
 func setupKafka() {
-	brokers := make([]string, len(cfg.Kafka.Brokers))
-	for i, broker := range cfg.Kafka.Brokers {
-		brokers[i] = fmt.Sprintf("%s:%d", broker.Hostname, *broker.Port)
-	}
-
 	topic := ""
 	for _, t := range cfg.Kafka.Topics {
 		if t.RequestedName == "platform.sources.status" {
@@ -215,8 +201,31 @@ func setupKafka() {
 		panic("did not find topic for platform.sources.status, not good!")
 	}
 
-	k = kafka.NewWriter(kafka.WriterConfig{
-		Brokers: brokers,
-		Topic:   topic,
-	})
+	k = must(skafka.GetWriter(&cfg.Kafka.Brokers[0], topic))
+}
+
+func getCollection(endpoint, xrhid string) *sutil.Collection {
+	req := must(http.NewRequest(http.MethodGet, sourcesURL+endpoint, nil))
+	if xrhid != "" {
+		req.Header.Add("x-rh-identity", xrhid)
+	}
+
+	resp := must(http.DefaultClient.Do(req))
+	if resp.StatusCode != 200 {
+		panic("Failed to run request: " + endpoint)
+	}
+
+	bytes := must(io.ReadAll(resp.Body))
+	coll := sutil.Collection{}
+	json.Unmarshal(bytes, &coll)
+
+	return &coll
+}
+
+func must[T any](thing T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+
+	return thing
 }
