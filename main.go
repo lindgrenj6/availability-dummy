@@ -89,6 +89,7 @@ func sendBackRandomResponse(c echo.Context, appTypeId string) {
 		appID := getApplicationID(xrhid, body["source_id"].(string), appTypeId)
 		// 4. Send an availability_status message back to sources, using same x-rh-id
 		msg := generateStatusMessage(&StatusMessage{ResourceID: appID, ResourceType: "Application"})
+		c.Logger().Debugf("Sending [%s] for [%#v]", msg, body)
 		sendMessageToSources(msg, []byte(xrhid))
 	}(c, body, appTypeId)
 }
@@ -129,10 +130,13 @@ func generateStatusMessage(msg *StatusMessage) []byte {
 
 // Sends a message to sources with:
 // headers:
-//   event_type=availability_status
-//   x-rh-identity=the one passed in
+//
+//	event_type=availability_status
+//	x-rh-identity=the one passed in
+//
 // body:
-//   marshaled json `StatusMessage` struct
+//
+//	marshaled json `StatusMessage` struct
 func sendMessageToSources(msg, xrhid []byte) {
 	err := skafka.Produce(k, &skafka.Message{
 		Headers: []protocol.Header{
