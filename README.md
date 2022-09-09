@@ -10,7 +10,7 @@ Add this snippet to your local configuration:
 ```yaml
 - name: sources-availability
   host: github
-  repo: jlindgren/availability-dummy
+  repo: lindgrenj6/availability-dummy
   path: deploy/clowdapp.yaml
 ```
 from there there should be a `sources-availability-dummy` deployment created by the clowdapp.
