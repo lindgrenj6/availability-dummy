@@ -9,13 +9,12 @@ import (
 	"os"
 	"strings"
 
-	skafka "github.com/RedHatInsights/sources-api-go/kafka"
+	"github.com/RedHatInsights/sources-api-go/kafka"
 	sutil "github.com/RedHatInsights/sources-api-go/util"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	"github.com/labstack/gommon/log"
 	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
-	"github.com/segmentio/kafka-go"
 	"github.com/segmentio/kafka-go/protocol"
 )
 
@@ -23,7 +22,8 @@ var (
 	// clowder config
 	cfg = clowder.LoadedConfig
 	// kafka writer
-	k *kafka.Writer
+	k       *kafka.Writer
+	groupId = "dummy"
 	// cost/subswatch IDs for foreign key lookups.
 	costID   string
 	swatchID string
@@ -138,7 +138,7 @@ func generateStatusMessage(msg *StatusMessage) []byte {
 //
 //	marshaled json `StatusMessage` struct
 func sendMessageToSources(msg, xrhid []byte) {
-	err := skafka.Produce(k, &skafka.Message{
+	err := kafka.Produce(k, &kafka.Message{
 		Headers: []protocol.Header{
 			{Key: "x-rh-identity", Value: xrhid},
 			{Key: "event_type", Value: []byte("availability_status")},
@@ -205,7 +205,11 @@ func setupKafka() {
 		panic("did not find topic for platform.sources.status, not good!")
 	}
 
-	k = must(skafka.GetWriter(&cfg.Kafka.Brokers[0], topic))
+	k = must(kafka.GetWriter(&kafka.Options{
+		BrokerConfig: &cfg.Kafka.Brokers[0],
+		Topic:        topic,
+		GroupID:      &groupId,
+	}))
 }
 
 func getCollection(endpoint, xrhid string) *sutil.Collection {

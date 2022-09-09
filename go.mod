@@ -3,7 +3,7 @@ module github.com/lindgrenj6/availability-dummy
 go 1.18
 
 require (
-	github.com/RedHatInsights/sources-api-go v0.0.0-20220810122356-c8e6d72249a4
+	github.com/RedHatInsights/sources-api-go v0.0.0-20220909110643-3df83f7f476f
 	github.com/labstack/echo v3.3.10+incompatible
 	github.com/labstack/gommon v0.3.1
 	github.com/redhatinsights/app-common-go v1.6.3
@@ -14,12 +14,14 @@ require (
 	github.com/aws/aws-sdk-go v1.44.73 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
+	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/labstack/echo/v4 v4.8.0 // indirect
+	github.com/lindgrenj6/logrus_zinc v0.0.0-20220822152658-d8a0b604f3f9 // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
@@ -41,7 +43,7 @@ require (
 	github.com/xdg/stringprep v1.0.3 // indirect
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
 	golang.org/x/net v0.0.0-20220809184613-07c6da5e1ced // indirect
-	golang.org/x/sys v0.0.0-20220808155132-1c4a2a72c664 // indirect
+	golang.org/x/sys v0.0.0-20220818161305-2296e01440c6 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
